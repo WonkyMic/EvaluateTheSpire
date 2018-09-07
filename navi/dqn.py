@@ -18,7 +18,9 @@ class DQNAgent:
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
         self.learning_rate = 0.001
-        self.stateData = ""
+        self.stateData = pds.DataFrame()
+        self.combatDataDict = {}
+        self.stateDataDict = {}
         self.model = self.create_model()
 
     def loadStateDataToDatabase(self):
@@ -1008,6 +1010,7 @@ class DQNAgent:
             data.update(corrected_dict)
             n=n+1
         del data["jsonCardArrayListDrawPile"]
+        self.combatDataDict = data
         return data
 
     def combatDataToDF(self, combatData):
@@ -1078,6 +1081,7 @@ class DQNAgent:
             j=j+1
         del data["potions"]
 
+        self.stateDataDict = data
         return data
 
     def stateDataToDF(self, stateData):
@@ -1185,7 +1189,7 @@ class DQNAgent:
         from keras.models import Model
         from keras.layers import Dense, Input
         from keras.optimizers import RMSprop
-        S = Input(shape=[5541, ])
+        S = Input(shape=[5951, ])
         h0 = Dense(1000, activation="relu")(S)
         h1 = Dense(500, activation="relu")(h0)
         Target = Dense(5, activation="sigmoid")(h1)
@@ -1202,7 +1206,25 @@ class DQNAgent:
         global graph
         with graph.as_default():
             act_values = self.model.predict(data)
-        return act_values
+        return self.get_valid_monster(act_values), self.get_valid_action(act_values)
 
-#if __name__ == '__main__':
-#    agent = DQNAgent()
+    def get_valid_action(self, predicted_action_values):
+        cards = {k: v for k, v in self.combatDataDict.items() if 'handisPlayable' in k}
+        playable_cards = np.fromiter(cards.values(), dtype=int)
+
+        potions = {k: 1 if v != "" and v != "Potion Slot" else 0 for k, v in self.stateDataDict.items() if 'potions' in k}
+        playable_potions = np.fromiter(potions.values(), dtype=int)
+
+        playable_cards_and_actions = np.append(playable_cards, playable_potions)
+        playable_cards_and_actions = np.append(playable_cards_and_actions, np.array([1]))
+
+
+        final_action_values = np.multiply(playable_cards_and_actions, predicted_action_values[1])
+        return np.argmax(final_action_values[0])
+
+    def get_valid_monster(self, predicted_action_values):
+        monsters = {k: 1 if v != 0 else 0 for k, v in self.combatDataDict.items() if 'currentHealth' in k}
+        targetable_monsters = np.fromiter(monsters.values(), dtype=int)
+
+        final_action_values = np.multiply(targetable_monsters, predicted_action_values[0])
+        return np.argmax(final_action_values[0])

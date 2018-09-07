@@ -11,8 +11,7 @@ agent = DQNAgent()
 def state():
     content = request.get_json()
     agent.stateData = content
-    return True
-    #return jsonify(content)
+    return jsonify(content)
 
 @app.route('/navi/CombatDataDumptest-endpoint', methods=['GET', 'POST'])
 def combat():
@@ -20,10 +19,13 @@ def combat():
     current_state, combat_state = agent.create_combined_dataframe(agent.stateData, content)
 
     data = current_state.values
-    combat_action = agent.predict_combat_action(data)
+    monster_to_target, card_or_potion_to_use = agent.predict_combat_action(data)
     mydict = {
-        'x1': [x.tolist() for x in combat_action]
+        'monster_to_target': monster_to_target.tolist(),
+        'card_or_potion_to_use': card_or_potion_to_use.tolist()
     }
+
+    print(mydict)
 
     return jsonify(mydict)
 
