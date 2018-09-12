@@ -8,6 +8,20 @@ from collections import deque
 import configparser
 
 graph = []
+GAMMA = 0.99
+
+N_STEP_RETURN = 8
+GAMMA_N = GAMMA ** N_STEP_RETURN
+
+EPS_START = 0.4
+EPS_STOP  = .15
+EPS_STEPS = 75000
+
+MIN_BATCH = 32
+LEARNING_RATE = 5e-3
+
+LOSS_V = .5			# v loss coefficient
+LOSS_ENTROPY = .01 	# entropy coefficient
 
 
 class DQNAgent:
@@ -21,7 +35,15 @@ class DQNAgent:
         self.stateData = pds.DataFrame()
         self.combatDataDict = {}
         self.stateDataDict = {}
-        self.model = self.create_model()
+        self.current_state = pds.DataFrame()
+        self.previous_state = pds.DataFrame()
+        self.current_state_array = np.zeros((1, 5951))
+        self.previous_state_array = np.zeros((1, 5951))
+        self.current_action = np.zeros(21)
+        self.previous_action = np.zeros(21)
+        self.action_list = []
+        #self.model = self.create_model()
+        self.turn = 1
 
     def loadStateDataToDatabase(self):
         data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\StateDataDumpjsonDump.json"
@@ -929,85 +951,85 @@ class DQNAgent:
 
         i=0
         for enemy in data["jsonEnemyArrayList"]:
-            corrected_dict = {(k + str(i)): v for k, v in enemy.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {(k + str(i)): v for k, v in enemy.items()}
+            data.update({(k + str(i)): v for k, v in enemy.items()})
             i=i+1
         del data["jsonEnemyArrayList"]
 
         i=0
         for power in data["enemypowers0"]:
-            corrected_dict = {("enemypowers0"+k + str(i)): v for k, v in power.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("enemypowers0"+k + str(i)): v for k, v in power.items()}
+            data.update({("enemypowers0"+k + str(i)): v for k, v in power.items()})
             i=i+1
         del data["enemypowers0"]
 
         i=0
         for power in data["enemypowers1"]:
-            corrected_dict = {("enemypowers1"+k + str(i)): v for k, v in power.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("enemypowers1"+k + str(i)): v for k, v in power.items()}
+            data.update({("enemypowers1"+k + str(i)): v for k, v in power.items()})
             i=i+1
         del data["enemypowers1"]
 
         i=0
         for power in data["enemypowers2"]:
-            corrected_dict = {("enemypowers2"+k + str(i)): v for k, v in power.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("enemypowers2"+k + str(i)): v for k, v in power.items()}
+            data.update({("enemypowers2"+k + str(i)): v for k, v in power.items()})
             i=i+1
         del data["enemypowers2"]
 
         i=0
         for power in data["enemypowers3"]:
-            corrected_dict = {("enemypowers3"+k + str(i)): v for k, v in power.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("enemypowers3"+k + str(i)): v for k, v in power.items()}
+            data.update({("enemypowers3"+k + str(i)): v for k, v in power.items()})
             i=i+1
         del data["enemypowers3"]
 
         i=0
         for power in data["enemypowers4"]:
-            corrected_dict = {("enemypowers4"+k + str(i)): v for k, v in power.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("enemypowers4"+k + str(i)): v for k, v in power.items()}
+            data.update({("enemypowers4"+k + str(i)): v for k, v in power.items()})
             i=i+1
         del data["enemypowers4"]
 
         i=0
         for power in data["currentPowers"]:
-            corrected_dict = {(k + str(i)): v for k, v in power.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {(k + str(i)): v for k, v in power.items()}
+            data.update({(k + str(i)): v for k, v in power.items()})
             i=i+1
         del data["currentPowers"]
 
         i=0
         for s in data["currentOrbs"]:
-            corrected_dict = {'currentOrbs'+str(i):s.split(',')}
-            data.update(corrected_dict)
+            #corrected_dict = {'currentOrbs'+str(i):s.split(',')}
+            data.update({'currentOrbs'+str(i):s.split(',')})
             i=i+1
         del data["currentOrbs"]
 
         j=0
         for card in data["jsonCardArrayListHand"]:
-            corrected_dict = {("hand"+k + str(j)): v for k, v in card.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("hand"+k + str(j)): v for k, v in card.items()}
+            data.update({("hand"+k + str(j)): v for k, v in card.items()})
             j=j+1
         del data["jsonCardArrayListHand"]
 
         l=0
         for card in data["jsonCardArrayListExhaustPile"]:
-            corrected_dict = {("exhaust"+k + str(l)): v for k, v in card.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("exhaust"+k + str(l)): v for k, v in card.items()}
+            data.update({("exhaust"+k + str(l)): v for k, v in card.items()})
             l=l+1
         del data["jsonCardArrayListExhaustPile"]
 
         m=0
         for card in data["jsonCardArrayListDiscardPile"]:
-            corrected_dict = {("discard"+k + str(m)): v for k, v in card.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("discard"+k + str(m)): v for k, v in card.items()}
+            data.update({("discard"+k + str(m)): v for k, v in card.items()})
             m=m+1
         del data["jsonCardArrayListDiscardPile"]
 
         n=0
         for card in data["jsonCardArrayListDrawPile"]:
-            corrected_dict = {("draw"+k + str(n)): v for k, v in card.items()}
-            data.update(corrected_dict)
+            #corrected_dict = {("draw"+k + str(n)): v for k, v in card.items()}
+            data.update({("draw"+k + str(n)): v for k, v in card.items()})
             n=n+1
         del data["jsonCardArrayListDrawPile"]
         self.combatDataDict = data
@@ -1055,29 +1077,29 @@ class DQNAgent:
 
         i=0
         for relic in data["relicsOwned"]:
-            corrected_dict = {("relicsOwned" + str(i)): v for v in relic.split(",")}
-            data.update(corrected_dict)
+            #corrected_dict = {("relicsOwned" + str(i)): v for v in relic.split(",")}
+            data.update({("relicsOwned" + str(i)): v for v in relic.split(",")})
             i=i+1
         del data["relicsOwned"]
 
         i=0
         for relic in data["relicsSeen"]:
-            corrected_dict = {("relicsSeen" + str(i)): v for v in relic.split(",")}
-            data.update(corrected_dict)
+            #corrected_dict = {("relicsSeen" + str(i)): v for v in relic.split(",")}
+            data.update({("relicsSeen" + str(i)): v for v in relic.split(",")})
             i=i+1
         del data["relicsSeen"]
 
         i=0
         for card in data["deck"]:
-            corrected_dict = {("deck" + str(i)): v for v in card.split(",")}
-            data.update(corrected_dict)
+            #corrected_dict = {("deck" + str(i)): v for v in card.split(",")}
+            data.update({("deck" + str(i)): v for v in card.split(",")})
             i=i+1
         del data["deck"]
 
         j=0
         for potion in data["potions"]:
-            corrected_dict = {("potions" + str(j)): v for v in potion.split(",")}
-            data.update(corrected_dict)
+            #corrected_dict = {("potions" + str(j)): v for v in potion.split(",")}
+            data.update({("potions" + str(j)): v for v in potion.split(",")})
             j=j+1
         del data["potions"]
 
@@ -1108,16 +1130,20 @@ class DQNAgent:
         df = df[:1]
         return df
 
-    def getReward(self, state):
-        healthReward = state['currentHealth'] - state['maxHealth']
-        enemyHealthReward = (state['maxHealth0'] - state['currentHealth0']) + (state['maxHealth1'] - state['currentHealth1']) + (state['maxHealth2'] - state['currentHealth2']) + (state['maxHealth3'] - state['currentHealth3']) + (state['maxHealth4'] - state['currentHealth4'])
-        currentGoldReward = state['currentGold'] / 10
-        floorNumReward = state['floorNum']
-        actNumReward = state['actNum'] * 5 #maybe this should multiply all other rewards instead of being its own constant reward?
-        relic_id_cols = [col for col in state.columns if 'relic' in col]
-        relicReward = state.groupby(relic_id_cols).ngroups
-        reward = healthReward + enemyHealthReward + currentGoldReward + floorNumReward + actNumReward + relicReward
-        print("current reward: ", float(reward))
+    def get_reward(self):
+        if self.previous_state.empty:
+            reward = 0
+        else:
+            health_reward = self.current_state['currentHealth'] - self.previous_state['currentHealth']
+            enemy_health_reward = self.previous_state['currentHealth0'] - self.current_state['currentHealth0'] + self.previous_state['currentHealth1'] - self.current_state['currentHealth1'] + self.previous_state['currentHealth2'] - self.current_state['currentHealth2'] + self.previous_state['currentHealth3'] - self.current_state['currentHealth3'] + self.previous_state['currentHealth4'] - self.current_state['currentHealth4']
+            # currentGoldReward = self.current_state['currentGold'] / 10
+            # floorNumReward = self.current_state['floorNum']
+            # actNumReward = state['actNum'] * 5 #maybe this should multiply all other rewards instead of being its own constant reward?
+            # relic_id_cols = [col for col in state.columns if 'relic' in col]
+            # relicReward = state.groupby(relic_id_cols).ngroups
+            reward = health_reward + enemy_health_reward # + currentGoldReward + floorNumReward + actNumReward + relicReward
+        print("current reward: ", int(reward))
+        self.remember(self.previous_state, self.previous_action, reward, self.current_state, False)
         return reward
 
     def discount_rewards(self, r, gamma=0.99):
@@ -1160,6 +1186,10 @@ class DQNAgent:
         result = result.drop('gameID', 1)
         result = result.drop('combatStateID', 1)
         result = result.drop('currentStateID', 1)
+        self.previous_state_array = self.current_state_array
+        self.previous_state = self.current_state
+        self.current_state = result
+        self.current_state_array = self.current_state.values
         return result, combatDf
 
     def create_combat_action_space(self, state):
@@ -1192,8 +1222,8 @@ class DQNAgent:
         S = Input(shape=[5951, ])
         h0 = Dense(1000, activation="relu")(S)
         h1 = Dense(500, activation="relu")(h0)
-        Target = Dense(5, activation="sigmoid")(h1)
-        Action = Dense(16, activation="sigmoid")(h1)
+        Target = Dense(5, activation="softmax")(h1)
+        Action = Dense(16, activation="softmax")(h1)
         model = Model(inputs=S, outputs=[Target, Action])
         model.summary()
         optimizer = RMSprop(lr=0.00025, rho=0.95, epsilon=0.01)
@@ -1203,10 +1233,26 @@ class DQNAgent:
         return model
 
     def predict_combat_action(self, data):
+        #TODO: call model.fit(state,action) with numpy arrays of the state and the action somewhere?
         global graph
         with graph.as_default():
             act_values = self.model.predict(data)
-        return self.get_valid_monster(act_values), self.get_valid_action(act_values)
+        if self.turn != 1:
+            current_reward = self.get_reward()
+            #self.model.fit(self.current_state, self.action_list)
+        self.turn = self.turn+1
+        m = self.get_valid_monster(act_values)
+        c = self.get_valid_action(act_values)
+        monsters = np.zeros(5)
+        monsters[m] = 1
+        cards = np.zeros(16)
+        cards[c] = 1
+        self.action_list = []
+        self.action_list.append(monsters)
+        self.action_list.append(cards)
+        self.previous_action = self.current_action
+        self.current_action = np.append(m, c)
+        return m, c
 
     def get_valid_action(self, predicted_action_values):
         cards = {k: v for k, v in self.combatDataDict.items() if 'handisPlayable' in k}
@@ -1218,8 +1264,8 @@ class DQNAgent:
         playable_cards_and_actions = np.append(playable_cards, playable_potions)
         playable_cards_and_actions = np.append(playable_cards_and_actions, np.array([1]))
 
-
         final_action_values = np.multiply(playable_cards_and_actions, predicted_action_values[1])
+
         return np.argmax(final_action_values[0])
 
     def get_valid_monster(self, predicted_action_values):
@@ -1227,4 +1273,35 @@ class DQNAgent:
         targetable_monsters = np.fromiter(monsters.values(), dtype=int)
 
         final_action_values = np.multiply(targetable_monsters, predicted_action_values[0])
+
         return np.argmax(final_action_values[0])
+
+    def get_rand_valid_action(self):
+        cards = {k: v for k, v in self.combatDataDict.items() if 'handisPlayable' in k}
+        playable_cards = np.fromiter(cards.values(), dtype=int)
+
+        potions = {k: 1 if v != "" and v != "Potion Slot" else 0 for k, v in self.stateDataDict.items() if 'potions' in k}
+        playable_potions = np.fromiter(potions.values(), dtype=int)
+
+        playable_cards_and_actions = np.append(playable_cards, playable_potions)
+        playable_cards_and_actions = np.append(playable_cards_and_actions, np.array([1]))
+
+        final_action_value_index = np.random.choice(np.nonzero(playable_cards_and_actions == 1)[0], replace=False)
+        final_action_values = np.zeros(playable_cards_and_actions.shape)
+        final_action_values[final_action_value_index] = 1
+
+        return final_action_values
+
+    def get_rand_valid_monster(self):
+        monsters = {k: 1 if v != 0 else 0 for k, v in self.combatDataDict.items() if 'currentHealth' in k}
+        targetable_monsters = np.fromiter(monsters.values(), dtype=int)
+
+        if np.nonzero(targetable_monsters == 1)[0].size == 0:
+            final_action_values = np.zeros(targetable_monsters.shape)
+            final_action_values[0] = 1
+        else:
+            final_action_value_index = np.random.choice(np.nonzero(targetable_monsters == 1)[0], replace=False)
+            final_action_values = np.zeros(targetable_monsters.shape)
+            final_action_values[final_action_value_index] = 1
+
+        return final_action_values
