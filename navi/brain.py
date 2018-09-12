@@ -23,7 +23,7 @@ class Brain:
         self.LRC = 0.001     # Learning rate for Critic
 
         self.action_dim = 21  # Target/Action
-        self.state_dim = 5951  # columns in input state
+        self.state_dim = 130873  # columns in input state
 
         np.random.seed(1337)
         self.total_reward = 0.
