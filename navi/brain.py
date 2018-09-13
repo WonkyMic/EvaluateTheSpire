@@ -126,7 +126,7 @@ class Brain:
                 if dones[k]:
                     y_t[k] = rewards[k]
                 else:
-                    y_t[k] = rewards[k] + self.GAMMA*target_q_values[0][k]
+                    y_t[k] = rewards[k] + self.GAMMA*target_q_values[k][0]
 
             if self.train_indicator:
                 starttime = time.time()

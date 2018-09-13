@@ -1,43 +1,20 @@
 import json
 import psycopg2
-import pandas as pds
-import keras.backend as K
 import numpy as np
 import time
 import configparser
 
-graph = []
-GAMMA = 0.99
 
-N_STEP_RETURN = 8
-GAMMA_N = GAMMA ** N_STEP_RETURN
-
-EPS_START = 0.4
-EPS_STOP  = .15
-EPS_STEPS = 75000
-
-MIN_BATCH = 32
-LEARNING_RATE = 5e-3
-
-LOSS_V = .5			# v loss coefficient
-LOSS_ENTROPY = .01 	# entropy coefficient
-
-
-class DQNAgent:
+class StateHolder:
     def __init__(self):
-        self.gamma = 0.95    # discount rate
-        self.epsilon = 1.0  # exploration rate
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.001
-        self.stateData = pds.DataFrame()
         self.combatDataDict = {}
         self.stateDataDict = {}
+        self.previousCombatDataDict = {}
+        self.previousStateDataDict = {}
         self.current_state_array = np.zeros((130873,), dtype=int)
         self.previous_state_array = np.zeros((130873,), dtype=int)
         self.current_action = np.zeros(21, dtype=int)
         self.previous_action = np.zeros(21, dtype=int)
-        self.action_list = []
 
     def loadStateDataToDatabase(self):
         data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\StateDataDumpjsonDump.json"
@@ -163,6 +140,7 @@ class DQNAgent:
         del data["combatStateID"]
         del data["currentStateID"]
 
+        self.previousCombatDataDict = self.combatDataDict
         self.combatDataDict = data
 
         endtime = time.time()
@@ -190,6 +168,7 @@ class DQNAgent:
         del data["gameID"]
         del data["currentStateID"]
 
+        self.previousStateDataDict = self.stateDataDict
         self.stateDataDict = data
         return data
 
@@ -203,54 +182,17 @@ class DQNAgent:
         return arr
 
     def get_reward(self):
-        if True:  # .empty
+        if len(self.previousStateDataDict) == 0:  # .empty
             reward = 0
         else:
-            health_reward = self.current_state['currentHealth'] - self.previous_state['currentHealth']
-            enemy_health_reward = self.previous_state['currentHealth0'] - self.current_state['currentHealth0'] + self.previous_state['currentHealth1'] - self.current_state['currentHealth1'] + self.previous_state['currentHealth2'] - self.current_state['currentHealth2'] + self.previous_state['currentHealth3'] - self.current_state['currentHealth3'] + self.previous_state['currentHealth4'] - self.current_state['currentHealth4']
-            # currentGoldReward = self.current_state['currentGold'] / 10
-            # floorNumReward = self.current_state['floorNum']
-            # actNumReward = state['actNum'] * 5 #maybe this should multiply all other rewards instead of being its own constant reward?
-            # relic_id_cols = [col for col in state.columns if 'relic' in col]
-            # relicReward = state.groupby(relic_id_cols).ngroups
-            reward = health_reward + enemy_health_reward # + currentGoldReward + floorNumReward + actNumReward + relicReward
+            health_reward = self.stateDataDict['currentHealth'] - self.previousStateDataDict['currentHealth']
+            enemy_health_reward = self.previousCombatDataDict['currentHealth0'] - self.combatDataDict['currentHealth0'] + self.previousCombatDataDict['currentHealth1'] - self.combatDataDict['currentHealth1'] + self.previousCombatDataDict['currentHealth2'] - self.combatDataDict['currentHealth2'] + self.previousCombatDataDict['currentHealth3'] - self.combatDataDict['currentHealth3'] + self.previousCombatDataDict['currentHealth4'] - self.combatDataDict['currentHealth4']
+            reward = health_reward + enemy_health_reward
         print("current reward: ", int(reward))
         return reward
 
-    def discount_rewards(self, r, gamma=0.99):
-        """Takes 1d float array of rewards and computes discounted reward
-        e.g. f([1, 1, 1], 0.99) -> [2.9701, 1.99, 1]
-        """
-        prior = 0
-        out = []
-        for val in r:
-            new_val = val + prior * gamma
-            out.append(new_val)
-            prior = new_val
-        return np.array(out[::-1])
 
-    def custom_loss(self, y_true, y_pred):
-        log_lik = K.log(y_true * (y_true - y_pred) + (1 - y_true) * (y_true + y_pred))
-        return K.mean(log_lik, keepdims=True)
-
-    # Note: pass in_keras=False to use this function with raw numbers of numpy arrays for testing
-    def huber_loss(self, a, b, in_keras=True):
-        error = a - b
-        quadratic_term = error*error / 2
-        linear_term = abs(error) - 1/2
-        use_linear_term = (abs(error) > 1.0)
-        if in_keras:
-            # Keras won't let us multiply floats by booleans, so we explicitly cast the booleans to floats
-            use_linear_term = K.cast(use_linear_term, 'float32')
-        return use_linear_term * linear_term + (1-use_linear_term) * quadratic_term
-
-    def copy_model(self, model):
-        """Returns a copy of a keras model."""
-        import keras.models
-        model.save('tmp_model')
-        return keras.models.load_model('tmp_model', custom_objects={'huber_loss': self.huber_loss})
-
-    def create_combined_dataframe(self, stateData, combatData):
+    def create_combined_array(self, stateData, combatData):
         starttime = time.time()
         state_array = self.state_data_to_array(stateData)
         combat_array = self.combat_data_to_array(combatData)
@@ -258,7 +200,7 @@ class DQNAgent:
         self.previous_state_array = self.current_state_array
         self.current_state_array = result
         endtime = time.time()
-        print("create_combined_dataframe took {} seconds.".format(endtime-starttime))
+        print("create_combined_array took {} seconds.".format(endtime-starttime))
 
     def get_valid_action(self, predicted_action_values):
         cards = {k: v for k, v in self.combatDataDict.items() if 'handisPlayable' in k}

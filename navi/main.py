@@ -2,13 +2,11 @@ from flask import Flask
 from flask import jsonify
 from flask import request
 
-from dqn import DQNAgent
+from StateHolder import StateHolder
 from brain import Brain
 
-import numpy as np
-
 app = Flask(__name__)
-state_processor = DQNAgent()
+state_processor = StateHolder()
 brain = Brain()
 
 @app.route('/navi/StateDataDumptest-endpoint', methods=['GET', 'POST'])
@@ -20,7 +18,7 @@ def state():
 @app.route('/navi/CombatDataDumptest-endpoint', methods=['GET', 'POST'])
 def combat():
     content = request.get_json()
-    state_processor.create_combined_dataframe(state_processor.stateData, content)
+    state_processor.create_combined_array(state_processor.stateData, content)
 
     monster_to_target, card_or_potion_to_use = brain.get_action(state_processor)
     mydict = {
