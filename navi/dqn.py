@@ -3,8 +3,7 @@ import psycopg2
 import pandas as pds
 import keras.backend as K
 import numpy as np
-import tensorflow as tf
-from collections import deque
+import time
 import configparser
 
 graph = []
@@ -34,12 +33,10 @@ class DQNAgent:
         self.stateData = pds.DataFrame()
         self.combatDataDict = {}
         self.stateDataDict = {}
-        self.current_state = pds.DataFrame()
-        self.previous_state = pds.DataFrame()
-        self.current_state_array = np.zeros((1, 130873))
-        self.previous_state_array = np.zeros((1, 130873))
-        self.current_action = np.zeros(21)
-        self.previous_action = np.zeros(21)
+        self.current_state_array = np.zeros((130873,), dtype=int)
+        self.previous_state_array = np.zeros((130873,), dtype=int)
+        self.current_action = np.zeros(21, dtype=int)
+        self.previous_action = np.zeros(21, dtype=int)
         self.action_list = []
 
     def loadStateDataToDatabase(self):
@@ -61,29 +58,29 @@ class DQNAgent:
 
         j=0
         for card in data["jsonCardArrayListHand"]:
-                corrected_dict = {(k + str(j)): v for k, v in card.items()}
-        data.update(corrected_dict)
+            corrected_dict = {(k + str(j)): v for k, v in card.items()}
+            data.update(corrected_dict)
         j=j+1
         del data["jsonCardArrayListHand"]
 
         l=0
         for card in data["jsonCardArrayListExhaustPile"]:
             corrected_dict = {(k + str(l)): v for k, v in card.items()}
-        data.update(corrected_dict)
+            data.update(corrected_dict)
         l=l+1
         del data["jsonCardArrayListExhaustPile"]
 
         m=0
         for card in data["jsonCardArrayListDiscardPile"]:
             corrected_dict = {(k + str(m)): v for k, v in card.items()}
-        data.update(corrected_dict)
+            data.update(corrected_dict)
         m=m+1
         del data["jsonCardArrayListDiscardPile"]
 
         n=0
         for card in data["jsonCardArrayListDrawPile"]:
             corrected_dict = {(k + str(n)): v for k, v in card.items()}
-        data.update(corrected_dict)
+            data.update(corrected_dict)
         n=n+1
         del data["jsonCardArrayListDrawPile"]
 
@@ -124,6 +121,7 @@ class DQNAgent:
 
 
     def createCombatDict(self, combatData):
+        starttime = time.time()
         #data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\CombatDataDumpjsonDump.json"
         #with open(data_file, "r") as f:
         #    data = json.load(f)
@@ -132,49 +130,54 @@ class DQNAgent:
 
         i=0
         for enemy in data["jsonEnemyArrayList"]:
-            #corrected_dict = {(k + str(i)): v for k, v in enemy.items()}
             data.update({(k + str(i)): v for k, v in enemy.items()})
             i=i+1
         del data["jsonEnemyArrayList"]
 
         j=0
         for card in data["jsonCardArrayListHand"]:
-            #corrected_dict = {("hand"+k + str(j)): v for k, v in card.items()}
             data.update({("hand"+k + str(j)): v for k, v in card.items()})
             j=j+1
         del data["jsonCardArrayListHand"]
 
         l=0
         for card in data["jsonCardArrayListExhaustPile"]:
-            #corrected_dict = {("exhaust"+k + str(l)): v for k, v in card.items()}
             data.update({("exhaust"+k + str(l)): v for k, v in card.items()})
             l=l+1
         del data["jsonCardArrayListExhaustPile"]
 
         m=0
         for card in data["jsonCardArrayListDiscardPile"]:
-            #corrected_dict = {("discard"+k + str(m)): v for k, v in card.items()}
             data.update({("discard"+k + str(m)): v for k, v in card.items()})
             m=m+1
         del data["jsonCardArrayListDiscardPile"]
 
         n=0
         for card in data["jsonCardArrayListDrawPile"]:
-            #corrected_dict = {("draw"+k + str(n)): v for k, v in card.items()}
             data.update({("draw"+k + str(n)): v for k, v in card.items()})
             n=n+1
         del data["jsonCardArrayListDrawPile"]
+
+        # delete currently unnecessary data
+        del data["gameID"]
+        del data["combatStateID"]
+        del data["currentStateID"]
+
         self.combatDataDict = data
+
+        endtime = time.time()
+        print("createCombatDict took {} seconds.".format(endtime-starttime))
         return data
 
-    def combatDataToDF(self, combatData):
-        data = self.createCombatDict(combatData)
-        df = pds.DataFrame(dict([(k, pds.Series(v)) for k, v in data.items()]))
-        df = df.fillna('')
 
-        #for some reason, 9 extra rows get added. they only have blanks and -1's and all the data in row 0 look fine. so I will be dropping the last 9. expect a bug here.
-        df = df[:1]
-        return df
+    def combat_data_to_array(self, combatData):
+        starttime = time.time()
+        data = self.createCombatDict(combatData)
+        arr = np.fromiter(data.values(), dtype=int)
+
+        endtime = time.time()
+        print("combat_data_to_array took {} seconds.".format(endtime-starttime))
+        return arr
 
     def createStateDict(self, stateData):
         #data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\StateDataDumpjsonDump.json"
@@ -182,20 +185,25 @@ class DQNAgent:
         #    data = json.load(f)
 
         data = stateData
+
+        # delete currently unnecessary fields
+        del data["gameID"]
+        del data["currentStateID"]
+
         self.stateDataDict = data
         return data
 
-    def stateDataToDF(self, stateData):
+    def state_data_to_array(self, stateData):
+        starttime = time.time()
         data = self.createStateDict(stateData)
-        df = pds.DataFrame(dict([(k, pds.Series(v)) for k, v in data.items()]))
-        df = df.fillna('')
+        arr = np.fromiter(data.values(), dtype=int)
 
-        #for some reason, 9 extra rows get added. they only have blanks and -1's and all the data in row 0 look fine. so I will be dropping the last 9. expect a bug here.
-        df = df[:1]
-        return df
+        endtime = time.time()
+        print("state_data_to_array took {} seconds.".format(endtime-starttime))
+        return arr
 
     def get_reward(self):
-        if self.previous_state.empty:
+        if True:  # .empty
             reward = 0
         else:
             health_reward = self.current_state['currentHealth'] - self.previous_state['currentHealth']
@@ -243,17 +251,14 @@ class DQNAgent:
         return keras.models.load_model('tmp_model', custom_objects={'huber_loss': self.huber_loss})
 
     def create_combined_dataframe(self, stateData, combatData):
-        stateDf = self.stateDataToDF(stateData)
-        combatDf = self.combatDataToDF(combatData)
-        result = pds.concat([stateDf, combatDf], axis=1, join='inner')
-        result = result.drop('gameID', 1)
-        result = result.drop('combatStateID', 1)
-        result = result.drop('currentStateID', 1)
+        starttime = time.time()
+        state_array = self.state_data_to_array(stateData)
+        combat_array = self.combat_data_to_array(combatData)
+        result = np.append(state_array, combat_array)
         self.previous_state_array = self.current_state_array
-        self.previous_state = self.current_state
-        self.current_state = result
-        self.current_state_array = self.current_state.values
-        return result, combatDf
+        self.current_state_array = result
+        endtime = time.time()
+        print("create_combined_dataframe took {} seconds.".format(endtime-starttime))
 
     def get_valid_action(self, predicted_action_values):
         cards = {k: v for k, v in self.combatDataDict.items() if 'handisPlayable' in k}
@@ -278,6 +283,7 @@ class DQNAgent:
         return np.argmax(final_action_values[0])
 
     def get_rand_valid_action(self):
+        starttime = time.time()
         cards = {k: v for k, v in self.combatDataDict.items() if 'handisPlayable' in k}
         playable_cards = np.fromiter(cards.values(), dtype=int)
 
@@ -290,10 +296,13 @@ class DQNAgent:
         final_action_value_index = np.random.choice(np.nonzero(playable_cards_and_actions == 1)[0], replace=False)
         final_action_values = np.zeros(playable_cards_and_actions.shape)
         final_action_values[final_action_value_index] = 1
+        endtime = time.time()
+        print("get_rand_valid_action took {} seconds.".format(endtime-starttime))
 
         return final_action_values
 
     def get_rand_valid_monster(self):
+        starttime = time.time()
         monsters = {k: 1 if v != 0 else 0 for k, v in self.combatDataDict.items() if 'currentHealth' in k}
         targetable_monsters = np.fromiter(monsters.values(), dtype=int)
 
@@ -304,5 +313,8 @@ class DQNAgent:
             final_action_value_index = np.random.choice(np.nonzero(targetable_monsters == 1)[0], replace=False)
             final_action_values = np.zeros(targetable_monsters.shape)
             final_action_values[final_action_value_index] = 1
+
+        endtime = time.time()
+        print("get_rand_valid_monster took {} seconds.".format(endtime-starttime))
 
         return final_action_values

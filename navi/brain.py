@@ -2,21 +2,20 @@ import numpy as np
 import tensorflow as tf
 import json
 import random
+import time
 
 from ReplayBuffer import ReplayBuffer
 from ActorNetwork import ActorNetwork
 from CriticNetwork import CriticNetwork
 from OU import OU
-from dqn import DQNAgent
 
 OU = OU()       # Ornstein-Uhlenbeck Process
-#state_processor = DQNAgent()
 
 
 class Brain:
     def __init__(self):
         self.BUFFER_SIZE = 100000
-        self.BATCH_SIZE = 2  # 32
+        self.BATCH_SIZE = 32
         self.GAMMA = 0.99
         self.TAU = 0.001     # Target Network HyperParameters
         self.LRA = 0.0001    # Learning rate for Actor
@@ -79,19 +78,17 @@ class Brain:
         print("Finished saving model")
 
     def get_action(self, state_processor):
+        starttime = time.time()
         s_t1 = state_processor.previous_state_array
         a_t1 = state_processor.previous_action
         r_t1 = state_processor.get_reward()
         s_t = state_processor.current_state_array  # set s_t based on data input from Java
         if not s_t1.size:
             s_t1 = [np.zeros(5), np.zeros(16)]
-        #else:
-            #s_t1 = np.transpose(s_t1)
         s_t = np.transpose(s_t)
         self.buff.add(s_t1, a_t1, r_t1, s_t, False)      # Add replay buffer
 
         self.epsilon -= 1.0 / self.EXPLORE
-        # a_t = np.zeros([1, action_dim])
 
         if random.random() < self.epsilon:
             print("getting random action")
@@ -103,23 +100,27 @@ class Brain:
 
         state_processor.previous_action = state_processor.current_action
         state_processor.current_action = np.append(a_t[0], a_t[1])
-        # ob, r_t, done, info = env.step(a_t[0]) # send action to Java, wait for next state
+
+        endtime = time.time()
+        print("get_action took {} seconds.".format(endtime-starttime))
         return np.nonzero(a_t[0]), np.nonzero(a_t[1])
 
     def train_model(self, state_processor):
         # Do the batch update
         batch = self.buff.getBatch(self.BATCH_SIZE)
-        states = np.squeeze(np.asarray([e[0] for e in batch]), axis=1)
+        states = np.asarray([e[0] for e in batch])
         actions = np.asarray([e[1] for e in batch])
-        #actions2 = np.asarray([e[1][1] for e in batch])
         rewards = np.asarray([e[2] for e in batch])
-        new_states = np.squeeze(np.asarray([e[3] for e in batch]), axis=2)
+        new_states = np.asarray([e[3] for e in batch])
         dones = np.asarray([e[4] for e in batch])
         y_t = np.asarray([e[1] for e in batch])
 
         global graph
         with graph.as_default():
+            starttime = time.time()
             target_q_values = self.critic.target_model.predict([new_states, self.actor.target_model.predict(new_states)])
+            endtime = time.time()
+            print("critic target predict took {} seconds.".format(endtime-starttime))
 
             for k in range(len(batch)):
                 if dones[k]:
@@ -128,10 +129,18 @@ class Brain:
                     y_t[k] = rewards[k] + self.GAMMA*target_q_values[0][k]
 
             if self.train_indicator:
-                print(actions)
+                starttime = time.time()
                 self.loss += self.critic.model.train_on_batch([states, actions], y_t)
+                endtime = time.time()
+                print("critic train_on_batch took {} seconds.".format(endtime-starttime))
+                starttime = time.time()
                 a_for_grad = self.actor.model.predict(states)
+                endtime = time.time()
+                print("actor predict for gradient took {} seconds.".format(endtime-starttime))
+                starttime=time.time()
                 grads = self.critic.gradients(states, a_for_grad)
+                endtime = time.time()
+                print("critic gradients took {} seconds.".format(endtime-starttime))
                 self.actor.train(states, grads)
                 self.actor.target_train()
                 self.critic.target_train()
