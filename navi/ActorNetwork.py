@@ -4,8 +4,8 @@ import tensorflow as tf
 import keras.backend as K
 from keras.optimizers import RMSprop
 
-HIDDEN1_UNITS = 500
-HIDDEN2_UNITS = 1000
+HIDDEN1_UNITS = 100
+HIDDEN2_UNITS = 200
 
 class ActorNetwork(object):
     def __init__(self, sess, state_size, action_size, BATCH_SIZE, TAU, LEARNING_RATE):
@@ -23,7 +23,7 @@ class ActorNetwork(object):
         self.params_grad = tf.gradients(self.model.output, self.weights, -self.action_gradient)
         grads = zip(self.params_grad, self.weights)
         self.optimize = tf.train.AdamOptimizer(LEARNING_RATE).apply_gradients(grads)
-        self.optimizer = RMSprop(lr=0.00025, rho=0.95, epsilon=0.01)
+        self.optimizer = RMSprop(lr=0.00025, rho=0.9, epsilon=None)
         self.sess.run(tf.global_variables_initializer())
 
     def train(self, states, action_grads):
@@ -55,8 +55,8 @@ class ActorNetwork(object):
     def create_actor_network(state_size):
         print("Now we build the model")
         S = Input(shape=(state_size,))
-        h0 = Dense(1000, activation="relu")(S)
-        h1 = Dense(500, activation="relu")(h0)
+        h0 = Dense(HIDDEN2_UNITS, activation="relu")(S)
+        h1 = Dense(HIDDEN1_UNITS, activation="relu")(h0)
         Target = Dense(5, activation="softmax")(h1)
         Action = Dense(16, activation="softmax")(h1)
         V = concatenate([Target, Action])

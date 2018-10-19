@@ -11,10 +11,13 @@ class StateHolder:
         self.stateDataDict = {}
         self.previousCombatDataDict = {}
         self.previousStateDataDict = {}
-        self.current_state_array = np.zeros((130873,), dtype=int)
-        self.previous_state_array = np.zeros((130873,), dtype=int)
+        self.current_state_data = {}
+        self.current_state_array = np.zeros((131055,), dtype=int)
+        self.previous_state_array = np.zeros((131055,), dtype=int)
         self.current_action = np.zeros(21, dtype=int)
         self.previous_action = np.zeros(21, dtype=int)
+
+        self.generation = 0
 
     def loadStateDataToDatabase(self):
         data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\StateDataDumpjsonDump.json"
@@ -26,58 +29,57 @@ class StateHolder:
         data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\CombatDataDumpjsonDump.json"
         with open(data_file, "r") as f:
             data = json.load(f)
-        i=0
+        i = 0
         for enemy in data["jsonEnemyArrayList"]:
             corrected_dict = {(k + str(i)): v for k, v in enemy.items()}
             data.update(corrected_dict)
-            i=i+1
+            i = i+1
         del data["jsonEnemyArrayList"]
 
-        j=0
+        j = 0
         for card in data["jsonCardArrayListHand"]:
             corrected_dict = {(k + str(j)): v for k, v in card.items()}
             data.update(corrected_dict)
-        j=j+1
+            j = j+1
         del data["jsonCardArrayListHand"]
 
-        l=0
+        l = 0
         for card in data["jsonCardArrayListExhaustPile"]:
             corrected_dict = {(k + str(l)): v for k, v in card.items()}
             data.update(corrected_dict)
-        l=l+1
+            l = l+1
         del data["jsonCardArrayListExhaustPile"]
 
-        m=0
+        m = 0
         for card in data["jsonCardArrayListDiscardPile"]:
             corrected_dict = {(k + str(m)): v for k, v in card.items()}
             data.update(corrected_dict)
-        m=m+1
+            m = m+1
         del data["jsonCardArrayListDiscardPile"]
 
-        n=0
+        n = 0
         for card in data["jsonCardArrayListDrawPile"]:
             corrected_dict = {(k + str(n)): v for k, v in card.items()}
             data.update(corrected_dict)
-        n=n+1
+            n = n+1
         del data["jsonCardArrayListDrawPile"]
 
         self.loadDataToDatabase(data, "combatStateData")
 
         config = configparser.ConfigParser()
         config.read('config.ini')
-        #conn = psycopg2.connect(host=config['postgresql']['host'], database=config['postgresql']['database'],
+        # conn = psycopg2.connect(host=config['postgresql']['host'], database=config['postgresql']['database'],
         #                        user=config['postgresql']['user'], password=config['postgresql']['password'], port=config['postgresql']['port'])
-        #print("Database Connected")
+        # print("Database Connected")
 
-        #with conn.cursor() as cursor:
+        # with conn.cursor() as cursor:
         #    keys = data.keys()
         #    columns = ','.join(keys)
         #    values = ','.join(["%("+k+")s" for k in data])
         #    insert = 'INSERT into {0} ({1}) VALUES ({2})'.format("combatStateData", columns, values)
         #    print(insert, data)
         #    cursor.execute(insert, data)
-        #conn.commit()
-
+        # conn.commit()
 
     def loadDataToDatabase(self, data_dict, table_name):
         conn = psycopg2.connect(host="localhost", database="stsData",
@@ -96,43 +98,42 @@ class StateHolder:
         self.loadStateDataToDatabase()
         self.loadCombatDataToDatabase()
 
-
     def createCombatDict(self, combatData):
         starttime = time.time()
-        #data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\CombatDataDumpjsonDump.json"
-        #with open(data_file, "r") as f:
+        # data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\CombatDataDumpjsonDump.json"
+        # with open(data_file, "r") as f:
         #    data = json.load(f)
 
         data = combatData
 
-        i=0
+        i = 0
         for enemy in data["jsonEnemyArrayList"]:
             data.update({(k + str(i)): v for k, v in enemy.items()})
-            i=i+1
+            i = i+1
         del data["jsonEnemyArrayList"]
 
-        j=0
+        j = 0
         for card in data["jsonCardArrayListHand"]:
             data.update({("hand"+k + str(j)): v for k, v in card.items()})
-            j=j+1
+            j = j+1
         del data["jsonCardArrayListHand"]
 
-        l=0
+        l = 0
         for card in data["jsonCardArrayListExhaustPile"]:
             data.update({("exhaust"+k + str(l)): v for k, v in card.items()})
-            l=l+1
+            l = l+1
         del data["jsonCardArrayListExhaustPile"]
 
-        m=0
+        m = 0
         for card in data["jsonCardArrayListDiscardPile"]:
             data.update({("discard"+k + str(m)): v for k, v in card.items()})
-            m=m+1
+            m = m+1
         del data["jsonCardArrayListDiscardPile"]
 
-        n=0
+        n = 0
         for card in data["jsonCardArrayListDrawPile"]:
             data.update({("draw"+k + str(n)): v for k, v in card.items()})
-            n=n+1
+            n = n+1
         del data["jsonCardArrayListDrawPile"]
 
         # delete currently unnecessary data
@@ -158,8 +159,8 @@ class StateHolder:
         return arr
 
     def createStateDict(self, stateData):
-        #data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\StateDataDumpjsonDump.json"
-        #with open(data_file, "r") as f:
+        # data_file = "C:\\Users\\Hafez\\IdeaProjects\\NavigateTheSpire\\json\\StateDataDumpjsonDump.json"
+        # with open(data_file, "r") as f:
         #    data = json.load(f)
 
         data = stateData
@@ -186,11 +187,9 @@ class StateHolder:
             reward = 0
         else:
             health_reward = self.stateDataDict['currentHealth'] - self.previousStateDataDict['currentHealth']
-            enemy_health_reward = self.previousCombatDataDict['currentHealth0'] - self.combatDataDict['currentHealth0'] + self.previousCombatDataDict['currentHealth1'] - self.combatDataDict['currentHealth1'] + self.previousCombatDataDict['currentHealth2'] - self.combatDataDict['currentHealth2'] + self.previousCombatDataDict['currentHealth3'] - self.combatDataDict['currentHealth3'] + self.previousCombatDataDict['currentHealth4'] - self.combatDataDict['currentHealth4']
+            enemy_health_reward = 0  # self.previousCombatDataDict['currentHealth0'] - self.combatDataDict['currentHealth0'] + self.previousCombatDataDict['currentHealth1'] - self.combatDataDict['currentHealth1'] + self.previousCombatDataDict['currentHealth2'] - self.combatDataDict['currentHealth2'] + self.previousCombatDataDict['currentHealth3'] - self.combatDataDict['currentHealth3'] + self.previousCombatDataDict['currentHealth4'] - self.combatDataDict['currentHealth4']
             reward = health_reward + enemy_health_reward
-        print("current reward: ", int(reward))
         return reward
-
 
     def create_combined_array(self, stateData, combatData):
         starttime = time.time()
@@ -206,23 +205,35 @@ class StateHolder:
         cards = {k: v for k, v in self.combatDataDict.items() if 'handisPlayable' in k}
         playable_cards = np.fromiter(cards.values(), dtype=int)
 
-        potions = {k: 1 if v != "" and v != "Potion Slot" else 0 for k, v in self.stateDataDict.items() if 'potions' in k}
+        potions = {k: 0 if v == 1 else 1 for k, v in self.stateDataDict.items() if 'IsPotionSlot' in k}
         playable_potions = np.fromiter(potions.values(), dtype=int)
 
         playable_cards_and_actions = np.append(playable_cards, playable_potions)
         playable_cards_and_actions = np.append(playable_cards_and_actions, np.array([1]))
 
-        final_action_values = np.multiply(playable_cards_and_actions, predicted_action_values[1])
+        predicted_action_values[0][5:] = predicted_action_values[0][5:] + 0.0000001
 
-        return np.argmax(final_action_values[0])
+        final_action_values = np.multiply(playable_cards_and_actions, predicted_action_values[0][5:])
+        final_action_value_index = np.argmax(final_action_values)
+        if np.count_nonzero(playable_cards_and_actions) == 1:
+            final_action_value_index = 15
+        final_action_values = np.zeros(playable_cards_and_actions.shape)
+        final_action_values[final_action_value_index] = 1
+
+        return final_action_values
 
     def get_valid_monster(self, predicted_action_values):
         monsters = {k: 1 if v != 0 else 0 for k, v in self.combatDataDict.items() if 'currentHealth' in k}
         targetable_monsters = np.fromiter(monsters.values(), dtype=int)
 
-        final_action_values = np.multiply(targetable_monsters, predicted_action_values[0])
+        predicted_action_values[0][:5] = predicted_action_values[0][:5] + 0.0000001
 
-        return np.argmax(final_action_values[0])
+        final_action_values = np.multiply(targetable_monsters, predicted_action_values[0][:5])
+        final_action_value_index = np.argmax(final_action_values)
+        final_action_values = np.zeros(targetable_monsters.shape)
+        final_action_values[final_action_value_index] = 1
+
+        return final_action_values
 
     def get_rand_valid_action(self):
         starttime = time.time()

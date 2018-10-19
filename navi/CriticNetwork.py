@@ -5,8 +5,8 @@ import keras.backend as K
 import tensorflow as tf
 from keras.optimizers import RMSprop
 
-HIDDEN1_UNITS = 500
-HIDDEN2_UNITS = 1000
+HIDDEN1_UNITS = 100
+HIDDEN2_UNITS = 200
 
 class CriticNetwork(object):
     def __init__(self, sess, state_size, action_size, BATCH_SIZE, TAU, LEARNING_RATE):
@@ -22,7 +22,7 @@ class CriticNetwork(object):
         self.model, self.action, self.state = self.create_critic_network(state_size, action_size)
         self.target_model, self.target_action, self.target_state = self.create_critic_network(state_size, action_size)
         self.action_grads = tf.gradients(self.model.output, self.action)  # GRADIENTS for policy update
-        self.optimizer = RMSprop(lr=0.00025, rho=0.95, epsilon=0.01)
+        self.optimizer = RMSprop(lr=0.00025, rho=0.9, epsilon=None)
         self.sess.run(tf.global_variables_initializer())
 
     def gradients(self, states, actions):
@@ -53,7 +53,7 @@ class CriticNetwork(object):
     def create_critic_network(self, state_size, action_dim):
 
         S = Input(shape=(state_size,))
-        A = Input(shape=(5,), name='action1')
+        #A = Input(shape=(5,), name='action1')
         A = Input(shape=(21,), name='action2')
         w1 = Dense(HIDDEN1_UNITS, activation='relu')(S)
         a1 = Dense(HIDDEN2_UNITS, activation='linear')(A)
